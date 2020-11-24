@@ -2,13 +2,14 @@ import pandas as pd
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+import sqlite3
 
 #  ZADANIE 1
-files = [f for f in os.listdir('.') if f.endswith('.txt')]
+files = [os.path.join('names', f) for f in os.listdir('names') if f.endswith('.txt')]
 df_list = []
 for file in files:
     tmp_df = pd.read_csv(file, index_col=None, header=None)
-    year = file[3:-4]
+    year = file[-8:-4]
     tmp_df.loc[:, 'year'] = year
     tmp_df.rename(columns={0: 'name', 1: 'gender', 2: 'number'}, inplace=True)
     tmp_df.loc[:, 'total_births'] = tmp_df.loc[:, 'number'].sum()
@@ -32,10 +33,10 @@ print("Unikalnych imion męskich: " + str(len(names_m)))
 print("Unikalnych imion żeńskich: " + str(len(names_f)))
 
 #  ZADANIE 4
-# print("\nZADANIE 4")
+print("\nZADANIE 4")
 df.loc[df['gender'] == 'M', 'male_frequency'] = df.loc[df['gender'] == 'M', 'number'] / df.loc[df['gender'] == 'M', 'total_births_male']
 df.loc[df['gender'] == 'F', 'female_frequency'] = df.loc[df['gender'] == 'F', 'number'] / df.loc[df['gender'] == 'F', 'total_births_female']
-# print(df[['male_frequency', 'female_frequency']])
+print(df[['name','male_frequency', 'female_frequency']])
 
 #  ZADANIE 5
 print("\nZADANIE 5")
@@ -87,7 +88,7 @@ names_list = ['Harry', 'Marilin', male_top_1000.index[0], female_top_1000.index[
 axs = [(0,0), (0,1), (1,0), (1,1)]
 lata = ['1940', '1980', '2019']
 for it_name, it_ax in zip(names_list, axs):
-    name_data = popular['number'].loc[:,it_name]
+    name_data = popular['number'].fillna(0).loc[:,it_name]
     name_data.plot(ax=axes[it_ax], label='Liczba').set_title(it_name+" - zad 7")
     for rok in lata:
         liczba = str(popular['number'].fillna(0).loc[rok, it_name])
@@ -95,7 +96,7 @@ for it_name, it_ax in zip(names_list, axs):
     lines, labels = axes[it_ax].get_legend_handles_labels()
     ax2 = axes[it_ax].twinx()
     ax2.spines['right'].set_position(('axes', 1.0))
-    name_data = popular['number'].loc[:, it_name]/popular['total_births'].loc[:, it_name]
+    name_data = popular['number'].fillna(0).loc[:, it_name]/popular['total_births'].loc[:, it_name]
     name_data.plot(ax=ax2, label='Popularność', color='red')
     line, label = ax2.get_legend_handles_labels()
     lines += line
@@ -112,7 +113,7 @@ procent_df = pd.DataFrame(index=births_per_year.index)
 procent_df.loc[:,'male'] = popular_by_year_male.sum(axis=1)/births_per_year.loc[:,'total_births_male']
 procent_df.loc[:,'female'] = popular_by_year_female.sum(axis=1)/births_per_year.loc[:,'total_births_female']
 procent_df.rename_axis('year', inplace=True)
-procent_df.plot(use_index=True, y=['male', 'female']).set_title('Różnorodność imion - zad 8')
+procent_df.plot(use_index=True, y=['male', 'female']).set_title('Różnorodność imion (ułamek imion w top 1000) - zad 8')
 
 roznica_df = procent_df.iloc[(procent_df['male']-procent_df['female']).abs().argsort()]
 print('Największą różnicę w różnorodności między imionami męskimi a żeńskimi zaobserwowano w '+str(roznica_df.iloc[-1].name+' roku.'))
@@ -188,19 +189,19 @@ ratio2 = pd.concat([pd.DataFrame(ratio.loc['M', :].rename(columns={"number": "ma
                     pd.DataFrame(ratio.loc['F', :].rename(columns={"number": "female"}))],
                    axis=1)
 
-ratio2['ratio_M'] = (ratio2['male']/ratio2['male'].sum()).fillna(0)
-ratio2['ratio_F'] = (ratio2['female']/ratio2['female'].sum()).fillna(0)
-# print(ratio2)
+ratio2['ratio_M'] = (ratio2['male'].fillna(0)/ratio2.fillna(0).sum(axis=1))
+ratio2['ratio_F'] = (ratio2['female'].fillna(0)/ratio2.fillna(0).sum(axis=1))
+# print(ratio2.loc['James', :])
 
 ratio1880_1920 = ratio2.groupby(['year', 'name']).sum().loc['1880':'1920', :].groupby(['name']).sum()
-ratio1880_1920['ratio_M'] = (ratio1880_1920['male']/(ratio1880_1920['male'].sum()+ratio1880_1920['female'].sum())).fillna(0).replace([np.inf, -np.inf], 0)
-ratio1880_1920['ratio_F'] = (ratio1880_1920['female']/(ratio1880_1920['male'].sum()+ratio1880_1920['female'].sum())).fillna(0).replace([np.inf, -np.inf], 0)
+ratio1880_1920['ratio_M'] = (ratio1880_1920['male']/(ratio1880_1920.sum(axis=1))).fillna(0).replace([np.inf, -np.inf], 0)
+ratio1880_1920['ratio_F'] = (ratio1880_1920['female']/(ratio1880_1920.sum(axis=1))).fillna(0).replace([np.inf, -np.inf], 0)
 ratio1880_1920['diff1'] = ratio1880_1920['ratio_M'] - ratio1880_1920['ratio_F']
 # print(ratio1880_1920)
 
 ratio2000_2020 = ratio2.groupby(['year', 'name']).sum().loc['2000':'2020', :].groupby(['name']).sum()
-ratio2000_2020['ratio_M'] = (ratio2000_2020['male']/(ratio2000_2020['male'].sum()+ratio2000_2020['female'].sum())).fillna(0).replace([np.inf, -np.inf], 0)
-ratio2000_2020['ratio_F'] = (ratio2000_2020['female']/(ratio2000_2020['male'].sum()+ratio2000_2020['female'].sum())).fillna(0).replace([np.inf, -np.inf], 0)
+ratio2000_2020['ratio_M'] = (ratio2000_2020['male']/(ratio2000_2020.sum(axis=1))).fillna(0).replace([np.inf, -np.inf], 0)
+ratio2000_2020['ratio_F'] = (ratio2000_2020['female']/(ratio2000_2020.sum(axis=1))).fillna(0).replace([np.inf, -np.inf], 0)
 ratio2000_2020['diff2'] = ratio2000_2020['ratio_M'] - ratio2000_2020['ratio_F']
 # print(ratio2000_2020)
 
@@ -211,10 +212,58 @@ print("Imiona, które były początkowo żeńskie: " + str(diff.index[0]) +' i '
 print("Imiona, które były początkowo męskie: " + str(diff.index[-1]) +' i ' + str(diff.index[-2]))
 
 fig, axes = plt.subplots(nrows=2, ncols=2)
-ratio2.loc[str(diff.index[0]),:].plot(ax=axes[0,0], y=['ratio_M', 'ratio_F']).set_title(str(diff.index[0]))
-ratio2.loc[str(diff.index[1]),:].plot(ax=axes[0,1], y=['ratio_M', 'ratio_F']).set_title(str(diff.index[1]))
-ratio2.loc[str(diff.index[-1]),:].plot(ax=axes[1,0], y=['ratio_M', 'ratio_F']).set_title(str(diff.index[-1]))
-ratio2.loc[str(diff.index[-2]),:].plot(ax=axes[1,1], y=['ratio_M', 'ratio_F']).set_title(str(diff.index[-2]))
+ratio2.loc[str(diff.index[0]),:].plot(ax=axes[0,0], y=['ratio_M', 'ratio_F'], label=['male','female']).set_title(str(diff.index[0]))
+ratio2.loc[str(diff.index[1]),:].plot(ax=axes[0,1], y=['ratio_M', 'ratio_F'], label=['male','female']).set_title(str(diff.index[1]))
+ratio2.loc[str(diff.index[-1]),:].plot(ax=axes[1,0], y=['ratio_M', 'ratio_F'], label=['male','female']).set_title(str(diff.index[-1]))
+ratio2.loc[str(diff.index[-2]),:].plot(ax=axes[1,1], y=['ratio_M', 'ratio_F'], label=['male','female']).set_title(str(diff.index[-2]))
 
+#  ZADANIE 12
+conn = sqlite3.connect("USA_ltper_1x1.sqlite")
+deathF_df = pd.read_sql_query("SELECT * from USA_fltper_1x1", conn)
+deathM_df = pd.read_sql_query("SELECT * from USA_mltper_1x1", conn)
+conn.close()
+
+#  ZADANIE 13
+print("\nZADANIE 13")
+# print(deathM_df)
+deathM_df['Age'] = pd.to_numeric(deathM_df['Age'], errors='coerce')
+deathF_df['Age'] = pd.to_numeric(deathF_df['Age'], errors='coerce')
+births_df = pd.DataFrame(births_per_year.loc['1959':'2017', :]['total_births'])
+
+births = births_df.sum()
+deaths = deathM_df['dx'].sum() + deathF_df['dx'].sum()
+
+print('Przyrost naturalny w latach 1959 - 2018 wynosi ' + str(births['total_births'] - deaths))
+
+#  ZADANIE 14
+# print("\nZADANIE 14")
+deathF_df['Year'] = deathF_df['Year'].map(str)
+deathM_df['Year'] = deathM_df['Year'].map(str)
+
+deathF_df = deathF_df.rename(columns={'Year':'year'})
+deathM_df = deathM_df.rename(columns={'Year':'year'})
+births_df['deaths'] = deathF_df.loc[deathF_df['Age'] == 0, ['year', 'dx']].set_index('year')['dx']
+births_df['deaths'] += deathM_df.loc[deathM_df['Age'] == 0, ['year', 'dx']].set_index('year')['dx']
+
+births_df['survival'] = (births_df['total_births'] - births_df['deaths']) / births_df['total_births']
+# axs = births_df.plot(use_index=True, y='survival', label='W pierwszym roku życia').set_title('Współczynnik przeżywalności')
+
+#  ZADANIE 15
+deathF_df = deathF_df.loc[(deathF_df['Age'] >= 0) & (deathF_df['Age'] <= 5), ['year', 'Age', 'dx']]
+deathM_df = deathM_df.loc[(deathM_df['Age'] >= 0) & (deathM_df['Age'] <= 5), ['year', 'Age', 'dx']]
+
+years = range(1959, 2014)
+
+for year in years:
+    tmp_df = pd.DataFrame()
+    sum_dx = 0
+    for i in range(5):
+        sum_dx += deathF_df.loc[(deathF_df['year'] == str(year + i)) & (deathF_df['Age'] == i), 'dx'].values[0]
+        sum_dx += deathM_df.loc[(deathM_df['year'] == str(year + i)) & (deathM_df['Age'] == i), 'dx'].values[0]
+    births_df.loc[str(year), 'deaths5'] = sum_dx
+
+births_df['survival5'] = (births_df['total_births'] - births_df['deaths5']) / births_df['total_births']
+births_df.plot(use_index=True, y=['survival', 'survival5'], label=['W pierwszym roku życia', 'W pięciu pierwszych latach życia']
+               ).set_title('Współczynnik przeżywalności - zad 14 i 15'  )
 
 plt.show()
